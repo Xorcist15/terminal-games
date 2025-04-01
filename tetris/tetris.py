@@ -54,7 +54,7 @@ def place_piece(piece):
             if cell:
                 grid[piece.y + i][piece.x + j] = piece.color  # Store the color
 
-with term.fullscreen(), term.cbreak():
+with term.fullscreen(), term.cbreak(), term.hidden_cursor():
     active_piece = Tetrimino.random_tetrimino()
     last_fall_time = time.time()
 
