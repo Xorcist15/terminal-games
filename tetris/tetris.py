@@ -10,6 +10,7 @@ grid = [[None for _ in range(10)] for _ in range(20)]
 WIDTH = 10
 HEIGHT = 20
 FALL_SPEED = 1
+score = 0
 
 def render_grid(piece):
     print(term.clear()) 
@@ -17,14 +18,14 @@ def render_grid(piece):
     for i in range(HEIGHT): 
         for j in range(WIDTH):
             if grid[i][j]:
-                print(term.move_xy(j*2, i) + grid[i][j]("1"), end="")
+                print(term.move_xy(j*2, i) + grid[i][j]("██"), end="")
             else:
                 print(term.move_xy(j*2, i) + "0", end="")
     # render current current_piece
     for i in range (len(piece.shape)):
         for j in range(len(piece.shape[0])):
             if piece.shape[i][j] == 1:
-                print(term.move_xy((piece.x + j) * 2, piece.y + i) + piece.color("1"))
+                print(term.move_xy((piece.x + j) * 2, piece.y + i) + piece.color("██"))
     return
 
 def is_valid_move(piece, dx, dy):
@@ -158,13 +159,12 @@ with term.fullscreen(), term.cbreak(), term.hidden_cursor():
 
         current_time = time.monotonic()
 
-        if (current_time - last_fall_time > FALL_SPEED):
-            current_piece.move(0, 1)
-            last_fall_time = current_time 
-
         if(is_piece_placed(current_piece)):
             save_to_grid(current_piece)
             current_piece = Tetrimino.random_tetrimino()
 
+        if (current_time - last_fall_time > FALL_SPEED):
+            current_piece.move(0, 1)
+            last_fall_time = current_time 
 
 
