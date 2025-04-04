@@ -20,7 +20,7 @@ TETRIMINOS = {
 }
 
 class Tetrimino:
-    def __init__(self, name, x=4, y=0):
+    def __init__(self, name, x=4, y=-1):
         self.name = name
         self.shape, self.color = TETRIMINOS[name]
         self.x = x
