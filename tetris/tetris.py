@@ -5,7 +5,6 @@ from tetrimino import Tetrimino as Tet
 
 term = Terminal()
 
-FPS = 0.5     # 2 frames rendered per second  
 WIDTH = 10
 HEIGHT = 20
 
@@ -13,21 +12,27 @@ game_paused = False
 
 grid = [[None for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
+# TODO score system, improve UI, reduce render frequency
+# TODO better gameplay mechanics
+
 # debugging functions
 def debugger(msg, x, y):
     print(term.move_xy(x, y) + msg)
     return
 
 def render_grid_state():
-    for i in range(len(grid)):  
+    screen = ""
+
+    for i in range(len(grid)):
         for j in range(len(grid[0])):
+            x = j * 2 + 60  # move right to show the state next to the game
+            y = i
             if grid[i][j]:
-                j*=2
-                print(term.move_xy(j + 60, i) + term.green("1"))
+                screen += term.move_xy(x, y) + term.green("1")
             else:
-                j*=2
-                print(term.move_xy(j + 60, i) + term.red("0"))
-    return
+                screen += term.move_xy(x, y) + term.red("0")
+
+    print(screen)
 
 def graduations():
     # vertical
@@ -47,22 +52,37 @@ def pause_game():
     debugger(msg, 30, 16)
     return
 
-def render_grid():
-    #print(term.clear())
+
+def render_grid(piece):
+    screen = ""
+
+    # Render the static grid first
     for i in range(len(grid)):
         for j in range(len(grid[0])):
+            x = j * 2
+            y = i
             if grid[i][j]:
-                print(term.move_xy(j * 2, i) + grid[i][j]("1"))
+                screen += term.move_xy(x, y) + grid[i][j]("1")
             else:
-                print(term.move_xy(j * 2, i) + ".")
-    return
+                screen += term.move_xy(x, y) + "."
 
-def render_piece(piece):
+    positions = []
+
+    # Render the current falling piece
     for i in range(len(piece.shape)):
         for j in range(len(piece.shape[0])):
             if piece.shape[i][j]:
-                print(term.move_xy((piece.x + j) * 2, piece.y + i) + piece.color("1"))
-    return
+                x = piece.x + j
+                y = piece.y + i
+                screen += term.move_xy(x * 2, y) + piece.color("1")
+                positions.append((x, y))
+
+    # Add debug info
+    msg = f"{positions}"
+    screen += term.move_xy(20, 20) + msg
+
+    # Clear screen and print everything at once
+    print(screen)
 
 def is_piece_placed(piece):
     msg = f"current position: ({str(piece.x)},{str(piece.y)})"
@@ -171,56 +191,66 @@ def save_to_grid(piece):
                 debugger(msg, 30, 4)
     return
 
+
+FALL_FREQUENCY = 0.5
+INPUT_FREQUENCY = 0.01
+
 with term.cbreak(), term.fullscreen(), term.hidden_cursor():
-    init_time = time.monotonic()
     current_piece = Tet.random_tetrimino()
 
-    # game loop
+    gravity_timer = time.monotonic()
+    input_timer = time.monotonic()
+
+    graduations()
+
     while True:
-        key = term.inkey(timeout = 0.1)
-        if not game_paused:
-            # controller hjkli
-            if key == 'h':
-                # go left
-                if is_valid_move(current_piece, -1, 0):
+        current_time = time.monotonic()
+
+        # input handling 
+        if current_time - input_timer >= INPUT_FREQUENCY:
+            key = term.inkey(timeout=0)
+
+            if not game_paused:
+                if key == 'h' and is_valid_move(current_piece, -1, 0):
                     current_piece.move(-1, 0)
-            elif key == 'j':
-                # go down
-                if is_valid_move(current_piece, 0, 1):
-                    current_piece.move(0, 1)
-            elif key == 'k':
-                # rotation
-                if is_valid_rotation(current_piece):
-                    current_piece.rotate()
-            elif key == 'l':
-                # go right 
-                if is_valid_move(current_piece, 1, 0):
+                elif key == 'l' and is_valid_move(current_piece, 1, 0):
                     current_piece.move(1, 0)
-            elif key == ' ':
-                # place down piece
-                place_piece(current_piece)
-            elif key == 'q':
-                # exit game
-                exit()
-        if key == 'p':
-            pause_game()
-
-        if not game_paused:
-            current_time = time.monotonic()
-            if current_time - init_time > FPS:
-                init_time = time.monotonic()
-                # game logic
-                if is_piece_placed(current_piece):
-                    save_to_grid(current_piece) 
+                elif key == 'j' and is_valid_move(current_piece, 0, 1):
+                    current_piece.move(0, 1)
+                elif key == 'k' and is_valid_rotation(current_piece):
+                    current_piece.rotate()
+                elif key == ' ':
+                    if check_game_end(current_piece):  # add this!
+                        show_end_msg()
+                        break
+                    place_piece(current_piece)
+                    check_lines()
                     current_piece = Tet.random_tetrimino()
-                    check_game_end(current_piece)
+                elif key == 'q':
+                    exit()
 
-                # update game state
-                current_piece.move(0, 1)
+            if key == 'p':
+                pause_game()
+
+            # the problem here is that it's actually alterning between the 2 characters
+            # meaning it's switching so fast which creates an unpleasant visual effect
+            render_grid(current_piece)
+            render_grid_state()
+
+            input_timer = current_time
+
+            # gravity update (FIXED)
+        if not game_paused and (current_time - gravity_timer >= FALL_FREQUENCY):
+            if is_piece_placed(current_piece):
+                # Check if placing the piece would cause game over
+                if check_game_end(current_piece):
+                    show_end_msg()
+                    break  # stop the game loop
+                save_to_grid(current_piece)
                 check_lines()
+                current_piece = Tet.random_tetrimino()
+            else:
+                current_piece.move(0, 1)
+            gravity_timer = current_time
 
-                # render game state
-                render_grid()
-                render_piece(current_piece)
-                graduations()
-                render_grid_state()
+
